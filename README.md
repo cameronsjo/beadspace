@@ -46,13 +46,10 @@ This auto-regenerates `issues.json` whenever `.beads/` changes on push.
 ### 4. Enable GitHub Pages
 
 ```bash
-gh api repos/{owner}/{repo}/pages \
-  -X POST \
-  -f source.branch=main \
-  -f source.path=/docs/beadspace
+gh api repos/{owner}/{repo}/pages -X POST -f "build_type=workflow"
 ```
 
-Or: Settings > Pages > Source: "Deploy from a branch" > `main` / `/docs/beadspace`.
+Or: Settings > Pages > Source: **"GitHub Actions"** (not "Deploy from a branch").
 
 Your dashboard will be at `https://{owner}.github.io/{repo}/`.
 

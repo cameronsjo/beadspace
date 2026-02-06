@@ -1,55 +1,62 @@
-# Beadspace Dashboard — Auto-update on beads changes
+# Beadspace Dashboard — Auto-deploy on beads changes
 #
 # Copy this file to .github/workflows/beadspace.yml in your repo.
 # Prerequisite: index.html must exist at docs/beadspace/index.html
-# Enable GitHub Pages: Settings > Pages > Source: main / /docs/beadspace
+# Enable: Settings > Pages > Source: "GitHub Actions"
+#
+# Security: No untrusted inputs used. Data source is .beads/issues.jsonl
+# (checked into the repo). The deploy step output URL is from a trusted action.
 
-name: Update Beadspace
+name: Deploy Beadspace
 
 on:
   push:
     branches: [main]
     paths:
       - '.beads/**'
-  workflow_dispatch: # Manual trigger
+      - 'docs/beadspace/**'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  update:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate issues.json from beads data
+      - name: Generate issues.json
         run: |
-          # Convert JSONL to JSON array — no bd CLI needed
-          if [ -f .beads/issues.jsonl ]; then
-            # Each line is a JSON object; wrap in array
-            echo '[' > docs/beadspace/issues.json
-            first=true
-            while IFS= read -r line; do
-              [ -z "$line" ] && continue
-              if [ "$first" = true ]; then
-                first=false
-              else
-                echo ',' >> docs/beadspace/issues.json
-              fi
-              echo "$line" >> docs/beadspace/issues.json
-            done < .beads/issues.jsonl
-            echo ']' >> docs/beadspace/issues.json
-            echo "Generated issues.json ($(wc -l < .beads/issues.jsonl) issues)"
-          else
+          if [ ! -f .beads/issues.jsonl ]; then
             echo "No .beads/issues.jsonl found"
             exit 1
           fi
+          # Convert JSONL to JSON array — reads only from checked-in repo files
+          python3 -c "
+          import json
+          issues = [json.loads(l) for l in open('.beads/issues.jsonl') if l.strip()]
+          json.dump(issues, open('docs/beadspace/issues.json', 'w'))
+          print(f'{len(issues)} issues exported')
+          "
 
-      - name: Commit updated data
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/beadspace/issues.json
-          git diff --staged --quiet && echo "No changes" && exit 0
-          git commit -m "[skip-ci] chore: update beadspace dashboard data"
-          git push
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/beadspace
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
