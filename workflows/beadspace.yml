@@ -1,0 +1,55 @@
+# Beadspace Dashboard — Auto-update on beads changes
+#
+# Copy this file to .github/workflows/beadspace.yml in your repo.
+# Prerequisite: index.html must exist at docs/beadspace/index.html
+# Enable GitHub Pages: Settings > Pages > Source: main / /docs/beadspace
+
+name: Update Beadspace
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.beads/**'
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate issues.json from beads data
+        run: |
+          # Convert JSONL to JSON array — no bd CLI needed
+          if [ -f .beads/issues.jsonl ]; then
+            # Each line is a JSON object; wrap in array
+            echo '[' > docs/beadspace/issues.json
+            first=true
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo ',' >> docs/beadspace/issues.json
+              fi
+              echo "$line" >> docs/beadspace/issues.json
+            done < .beads/issues.jsonl
+            echo ']' >> docs/beadspace/issues.json
+            echo "Generated issues.json ($(wc -l < .beads/issues.jsonl) issues)"
+          else
+            echo "No .beads/issues.jsonl found"
+            exit 1
+          fi
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/beadspace/issues.json
+          git diff --staged --quiet && echo "No changes" && exit 0
+          git commit -m "[skip-ci] chore: update beadspace dashboard data"
+          git push
