@@ -22,28 +22,21 @@ python3 -m http.server 8080
 # Open http://localhost:8080
 ```
 
-## Drop Into Your Repo
-
-### 1. Copy the files
+## Install
 
 ```bash
-mkdir -p docs/beadspace
-cp index.html docs/beadspace/
+curl -sL https://raw.githubusercontent.com/cameronsjo/beadspace/main/install.sh | bash
 ```
 
-### 2. Generate initial data
+This creates `.beadspace/` with the dashboard, adds the GitHub Actions workflow, and generates `issues.json` from your `.beads/` data (or an empty file if you haven't created issues yet).
+
+Custom directory:
 
 ```bash
-bd export | jq -s '.' > docs/beadspace/issues.json
+BEADSPACE_DIR=docs/dashboard curl -sL https://raw.githubusercontent.com/cameronsjo/beadspace/main/install.sh | bash
 ```
 
-### 3. Add the GitHub Action
-
-Copy `workflows/beadspace.yml` to `.github/workflows/beadspace.yml` in your repo.
-
-This auto-regenerates `issues.json` whenever `.beads/` changes on push.
-
-### 4. Enable GitHub Pages
+After install, enable GitHub Pages:
 
 ```bash
 gh api repos/{owner}/{repo}/pages -X POST -f "build_type=workflow"
@@ -56,8 +49,8 @@ Your dashboard will be at `https://{owner}.github.io/{repo}/`.
 ## How It Works
 
 ```
-.beads/issues.jsonl  ──(bd export | jq -s)──>  issues.json  ──(fetch)──>  index.html
-     (your data)            (GH Action)          (JSON array)            (dashboard)
+.beads/issues.jsonl  ──(GH Action)──>  .beadspace/issues.json  ──(fetch)──>  index.html
+     (your data)                            (JSON array)                     (dashboard)
 ```
 
 - `index.html` is a static file — all logic runs client-side in vanilla JS

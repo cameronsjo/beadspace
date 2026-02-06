@@ -24,7 +24,8 @@ Client-side JS renders dashboard + issues table
 |------|---------|
 | `index.html` | The entire dashboard — HTML, CSS, JS all inline |
 | `issues.json` | Data file — JSON array, same schema as `bd export` |
-| `workflows/beadspace.yml` | GitHub Action template users copy to their repo |
+| `workflows/beadspace.yml` | GitHub Action template — installed by `install.sh` |
+| `install.sh` | One-command installer (`curl \| bash`) |
 
 ## Issue Schema
 
