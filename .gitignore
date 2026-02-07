@@ -1,1 +1,2 @@
-issues.json
+# Ignore root issues.json (local dev only), but allow .beadspace/issues.json (deployed)
+/issues.json

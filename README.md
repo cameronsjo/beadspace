@@ -4,12 +4,24 @@ A drop-in dashboard for [Beads](https://github.com/steveyegge/beads) issue track
 
 ![Dashboard](https://img.shields.io/badge/zero_dependencies-pure_HTML%2FCSS%2FJS-6366f1)
 
+![Dashboard — dark mode](docs/assets/preview-dark.png)
+
+![Issues table — dark mode](docs/assets/preview-issues.png)
+
+<details>
+<summary>Light mode</summary>
+
+![Dashboard — light mode](docs/assets/preview-light.png)
+
+</details>
+
 ## What You Get
 
 - **Dashboard**: Stats, triage suggestions (auto-flags misprioritized items), active issues sorted by priority
 - **Issues Table**: Search, filter by status, sort by any column
 - **Pure CSS charts**: Status donut, priority bars, label distribution — no Chart.js/D3
 - **Fully dynamic**: Reads `issues.json` at page load, no build step to change the UI
+- **Light & dark mode**: Follows your OS preference via `prefers-color-scheme`
 
 ## Quick Start (Local)
 
