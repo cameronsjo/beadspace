@@ -7,6 +7,7 @@ set -euo pipefail
 #   BEADSPACE_DIR=custom/path curl -sL ... | bash
 #   ./install.sh [target-dir]
 
+VERSION="v1"
 REPO_RAW="https://raw.githubusercontent.com/cameronsjo/beadspace/main"
 TARGET="${BEADSPACE_DIR:-${1:-.beadspace}}"
 
@@ -19,6 +20,19 @@ fi
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 TARGET_ABS="${PROJECT_ROOT}/${TARGET}"
+
+# --- Version check ---
+
+INSTALLED_VERSION=""
+VERSION_FILE="${TARGET_ABS}/.version"
+if [ -f "${VERSION_FILE}" ]; then
+    INSTALLED_VERSION=$(cat "${VERSION_FILE}")
+fi
+
+if [ "${INSTALLED_VERSION}" = "${VERSION}" ]; then
+    echo "Already up to date (${VERSION})."
+    echo "Re-downloading anyway..."
+fi
 
 # --- Download files ---
 
@@ -59,6 +73,10 @@ else
     echo "[]" > "${TARGET_ABS}/issues.json"
 fi
 
+# --- Write version ---
+
+echo "${VERSION}" > "${VERSION_FILE}"
+
 # --- Detect owner/repo for Pages hint ---
 
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
@@ -70,7 +88,11 @@ fi
 # --- Summary ---
 
 echo ""
-echo "Done!"
+if [ -n "${INSTALLED_VERSION}" ] && [ "${INSTALLED_VERSION}" != "${VERSION}" ]; then
+    echo "Upgraded ${INSTALLED_VERSION} -> ${VERSION}!"
+else
+    echo "Done! (${VERSION})"
+fi
 echo "  Created ${TARGET}/index.html"
 echo "  Created .github/workflows/beadspace.yml"
 echo "  Generated ${TARGET}/issues.json (${ISSUE_COUNT} issues)"

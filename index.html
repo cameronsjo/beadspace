@@ -35,6 +35,26 @@
     --severity-alert: #ef4444;
     --severity-warning: #f59e0b;
     --severity-info: #6366f1;
+    --bg-topbar: rgba(17, 17, 19, 0.85);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-deep: #f8f8fa;
+        --bg-surface: #ffffff;
+        --bg-elevated: #f0f0f3;
+        --bg-hover: #e8e8ec;
+        --border: #d4d4d8;
+        --border-bright: #a1a1aa;
+        --text-primary: #18181b;
+        --text-secondary: #52525b;
+        --text-muted: #a1a1aa;
+        --accent: #4f46e5;
+        --accent-bright: #6366f1;
+        --accent-dim: rgba(79, 70, 229, 0.1);
+        --p4: #a1a1aa;
+        --bg-topbar: rgba(248, 248, 250, 0.85);
+    }
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -59,13 +79,13 @@ body {
     height: 56px;
     gap: 2rem;
     backdrop-filter: blur(12px);
-    background: rgba(17, 17, 19, 0.85);
+    background: var(--bg-topbar);
 }
 
 .topbar-brand {
     font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 1.1rem;
+    font-weight: 700;
+    font-size: 1.05rem;
     letter-spacing: -0.02em;
     color: var(--text-primary);
     display: flex;
@@ -646,6 +666,20 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
 
+/* Footer */
+.footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+.footer a:hover { color: var(--accent-bright); }
+
 /* Transitions */
 .view { animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -656,7 +690,7 @@ body {
 <div class="topbar">
     <div class="topbar-brand">
         <span class="brand-dot"></span>
-        Beadspace
+        <span id="topbar-title"></span>
     </div>
     <div class="nav-tabs">
         <button class="nav-tab active" data-view="dashboard">Dashboard</button>
@@ -1005,6 +1039,14 @@ function bindIssuesEvents() {
     }
 }
 
+// ─── Repo name from URL path (e.g., owner.github.io/repo-name/) ─────────────
+var repoName = (function() {
+    var seg = window.location.pathname.split('/').filter(Boolean)[0];
+    return seg || 'Beadspace';
+})();
+document.getElementById('topbar-title').textContent = repoName;
+document.title = repoName;
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 fetch('issues.json')
     .then(function(r) {
@@ -1055,6 +1097,12 @@ fetch('issues.json')
         app.appendChild(errDiv);
     });
 </script>
+
+<footer class="footer">
+    Powered by <a href="https://github.com/steveyegge/beads">Beads</a>
+    &middot;
+    Dashboard by <a href="https://github.com/cameronsjo/beadspace">Beadspace</a>
+</footer>
 
 </body>
 </html>
