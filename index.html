@@ -723,7 +723,19 @@ function daysAgo(dateStr) {
     return Math.max(0, Math.floor(diff / 86400000));
 }
 
-function pShort(p) { return 'P' + (p != null ? p : 2); }
+function defaultPriority(p) { return p != null ? p : 2; }
+
+function pShort(p) { return 'P' + defaultPriority(p); }
+
+function statusLabel(status) {
+    if (status === 'in_progress') return 'In Progress';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function ageLabel(dateStr) {
+    var age = daysAgo(dateStr);
+    return age > 0 ? age + 'd' : 'today';
+}
 
 // ─── Triage Engine ───────────────────────────────────────────────────────────
 function triageSuggestions(issues) {
@@ -731,7 +743,7 @@ function triageSuggestions(issues) {
     issues.forEach(function(issue) {
         if (issue.status === 'closed') return;
         var age = daysAgo(issue.created_at);
-        var p = issue.priority != null ? issue.priority : 2;
+        var p = defaultPriority(issue.priority);
         var labels = issue.labels || [];
         var hasDesc = !!issue.description;
 
@@ -762,44 +774,59 @@ function triageSuggestions(issues) {
     return Object.values(seen).sort(function(a, b) { return rank[a.severity] - rank[b.severity]; });
 }
 
-// ─── Render Dashboard ────────────────────────────────────────────────────────
-function renderDashboard(issues) {
+// ─── Dashboard Stats ─────────────────────────────────────────────────────────
+function computeStats(issues) {
     var open = issues.filter(function(i) { return i.status === 'open'; });
     var wip = issues.filter(function(i) { return i.status === 'in_progress'; });
     var closed = issues.filter(function(i) { return i.status === 'closed'; });
     var total = issues.length;
-    var completionPct = total > 0 ? Math.round(closed.length / total * 100) : 0;
 
     // Priority counts
     var priCounts = [0, 0, 0, 0, 0];
-    issues.forEach(function(i) { var p = i.priority != null ? i.priority : 2; if (p >= 0 && p <= 4) priCounts[p]++; });
-    var maxPri = Math.max.apply(null, priCounts) || 1;
+    issues.forEach(function(i) { var p = defaultPriority(i.priority); if (p >= 0 && p <= 4) priCounts[p]++; });
 
     // Label counts
     var labelMap = {};
     issues.forEach(function(i) { (i.labels || []).forEach(function(l) { labelMap[l] = (labelMap[l] || 0) + 1; }); });
     var labels = Object.keys(labelMap).sort(function(a, b) { return labelMap[b] - labelMap[a]; });
-    var maxLabel = labels.length > 0 ? labelMap[labels[0]] : 1;
 
     // Type counts
     var typeMap = {};
     issues.forEach(function(i) { var t = i.issue_type || 'task'; typeMap[t] = (typeMap[t] || 0) + 1; });
 
-    // Donut
+    // Active issues sorted by priority then age
+    var active = open.concat(wip).sort(function(a, b) {
+        var pa = defaultPriority(a.priority);
+        var pb = defaultPriority(b.priority);
+        if (pa !== pb) return pa - pb;
+        return daysAgo(b.created_at) - daysAgo(a.created_at);
+    });
+
+    // Donut gradient
     var totalDonut = open.length + wip.length + closed.length;
     var openEnd = totalDonut > 0 ? (open.length / totalDonut * 100) : 0;
     var wipEnd = openEnd + (totalDonut > 0 ? (wip.length / totalDonut * 100) : 0);
     var donutGrad = 'conic-gradient(var(--status-open) 0% ' + openEnd.toFixed(1) + '%, var(--status-wip) ' + openEnd.toFixed(1) + '% ' + wipEnd.toFixed(1) + '%, var(--status-closed) ' + wipEnd.toFixed(1) + '% 100%)';
 
-    // Active issues sorted by priority then age
-    var active = open.concat(wip).sort(function(a, b) {
-        var pa = a.priority != null ? a.priority : 2;
-        var pb = b.priority != null ? b.priority : 2;
-        if (pa !== pb) return pa - pb;
-        return daysAgo(b.created_at) - daysAgo(a.created_at);
-    });
+    return {
+        open: open, wip: wip, closed: closed, total: total,
+        completionPct: total > 0 ? Math.round(closed.length / total * 100) : 0,
+        priCounts: priCounts, maxPri: Math.max.apply(null, priCounts) || 1,
+        labelMap: labelMap, labels: labels, maxLabel: labels.length > 0 ? labelMap[labels[0]] : 1,
+        typeMap: typeMap,
+        active: active, donutGrad: donutGrad,
+        suggestions: triageSuggestions(issues)
+    };
+}
 
-    var suggestions = triageSuggestions(issues);
+// ─── Render Dashboard ────────────────────────────────────────────────────────
+function renderDashboard(issues) {
+    var s = computeStats(issues);
+    var open = s.open, wip = s.wip, closed = s.closed, total = s.total;
+    var completionPct = s.completionPct, active = s.active, suggestions = s.suggestions;
+    var priCounts = s.priCounts, maxPri = s.maxPri;
+    var labelMap = s.labelMap, labels = s.labels, maxLabel = s.maxLabel;
+    var typeMap = s.typeMap, donutGrad = s.donutGrad;
 
     // Build suggestions HTML
     var suggestionsHtml = '';
@@ -818,10 +845,9 @@ function renderDashboard(issues) {
     var activeHtml = '';
     if (active.length > 0) {
         active.forEach(function(issue) {
-            var p = issue.priority != null ? issue.priority : 2;
-            var age = daysAgo(issue.created_at);
-            var ageStr = age > 0 ? age + 'd' : 'today';
-            var statusDisplay = issue.status === 'in_progress' ? 'WIP' : 'Open';
+            var p = defaultPriority(issue.priority);
+            var ageStr = ageLabel(issue.created_at);
+            var statusDisplay = statusLabel(issue.status);
             var tagsHtml = (issue.labels || []).map(function(l) { return '<span class="tag">' + esc(l) + '</span>'; }).join('');
             var itype = issue.issue_type || 'task';
             var descPreview = esc((issue.description || '').substring(0, 120));
@@ -895,10 +921,12 @@ function renderDashboard(issues) {
 }
 
 // ─── Issues Table (DOM-based rendering) ──────────────────────────────────────
-var ISSUES = [];
-var currentSort = { field: 'priority', dir: 1 };
-var currentFilter = 'open';
-var searchQuery = '';
+var tableState = {
+    issues: [],
+    sort: { field: 'priority', dir: 1 },
+    filter: 'open',
+    query: ''
+};
 
 function renderIssuesView() {
     return '<div id="view-issues" class="view">' +
@@ -921,10 +949,10 @@ function renderIssuesView() {
 }
 
 function renderIssuesTable() {
-    var filtered = ISSUES.filter(function(i) {
-        if (currentFilter !== 'all' && i.status !== currentFilter) return false;
-        if (searchQuery) {
-            var q = searchQuery.toLowerCase();
+    var filtered = tableState.issues.filter(function(i) {
+        if (tableState.filter !== 'all' && i.status !== tableState.filter) return false;
+        if (tableState.query) {
+            var q = tableState.query.toLowerCase();
             return (i.title || '').toLowerCase().indexOf(q) !== -1 ||
                    (i.id || '').toLowerCase().indexOf(q) !== -1 ||
                    (i.labels || []).some(function(l) { return l.toLowerCase().indexOf(q) !== -1; });
@@ -934,17 +962,17 @@ function renderIssuesTable() {
 
     filtered.sort(function(a, b) {
         var va, vb;
-        switch (currentSort.field) {
-            case 'priority': va = a.priority != null ? a.priority : 2; vb = b.priority != null ? b.priority : 2; break;
+        switch (tableState.sort.field) {
+            case 'priority': va = defaultPriority(a.priority); vb = defaultPriority(b.priority); break;
             case 'age': va = daysAgo(a.created_at); vb = daysAgo(b.created_at); break;
             case 'status': va = a.status; vb = b.status; break;
             case 'type': va = a.issue_type || ''; vb = b.issue_type || ''; break;
             case 'title': va = a.title || ''; vb = b.title || ''; break;
             case 'id': va = a.id || ''; vb = b.id || ''; break;
-            default: va = a.priority != null ? a.priority : 2; vb = b.priority != null ? b.priority : 2;
+            default: va = defaultPriority(a.priority); vb = defaultPriority(b.priority);
         }
-        if (typeof va === 'string') return va.localeCompare(vb) * currentSort.dir;
-        return (va - vb) * currentSort.dir;
+        if (typeof va === 'string') return va.localeCompare(vb) * tableState.sort.dir;
+        return (va - vb) * tableState.sort.dir;
     });
 
     // Build table using DOM methods (XSS-safe)
@@ -953,10 +981,9 @@ function renderIssuesTable() {
     while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
 
     filtered.forEach(function(i) {
-        var age = daysAgo(i.created_at);
-        var ageStr = age > 0 ? age + 'd' : 'today';
-        var p = i.priority != null ? i.priority : 2;
-        var statusLabel = i.status === 'in_progress' ? 'In Progress' : i.status.charAt(0).toUpperCase() + i.status.slice(1);
+        var ageStr = ageLabel(i.created_at);
+        var p = defaultPriority(i.priority);
+        var sl = statusLabel(i.status);
         var tr = document.createElement('tr');
 
         var tdId = document.createElement('td');
@@ -980,7 +1007,7 @@ function renderIssuesTable() {
         var statusDot = document.createElement('span');
         statusDot.className = 'status-dot ' + i.status;
         tdStatus.appendChild(statusDot);
-        tdStatus.appendChild(document.createTextNode(statusLabel));
+        tdStatus.appendChild(document.createTextNode(sl));
         tr.appendChild(tdStatus);
 
         var tdType = document.createElement('td');
@@ -1015,8 +1042,8 @@ function bindIssuesEvents() {
     document.querySelectorAll('.issues-table th[data-sort]').forEach(function(th) {
         th.addEventListener('click', function() {
             var field = th.dataset.sort;
-            if (currentSort.field === field) { currentSort.dir *= -1; }
-            else { currentSort = { field: field, dir: 1 }; }
+            if (tableState.sort.field === field) { tableState.sort.dir *= -1; }
+            else { tableState.sort = { field: field, dir: 1 }; }
             renderIssuesTable();
         });
     });
@@ -1025,7 +1052,7 @@ function bindIssuesEvents() {
         chip.addEventListener('click', function() {
             document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
             chip.classList.add('active');
-            currentFilter = chip.dataset.filter;
+            tableState.filter = chip.dataset.filter;
             renderIssuesTable();
         });
     });
@@ -1033,7 +1060,7 @@ function bindIssuesEvents() {
     var searchEl = document.getElementById('search');
     if (searchEl) {
         searchEl.addEventListener('input', function(e) {
-            searchQuery = e.target.value;
+            tableState.query = e.target.value;
             renderIssuesTable();
         });
     }
@@ -1054,7 +1081,7 @@ fetch('issues.json')
         return r.json();
     })
     .then(function(issues) {
-        ISSUES = issues;
+        tableState.issues = issues;
         document.getElementById('topbar-meta').textContent = issues.length + ' issues';
 
         // Render both views
